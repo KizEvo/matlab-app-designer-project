@@ -41,6 +41,12 @@ classdef integral_tab < matlab.apps.AppBase
                 if  isempty(HamField)
                     error('Không để trống hàm');
                 else
+                    len = length(HamField);
+                    for i = 1: (len- 1)
+                            if HamField(i) ~= '.' &&  HamField(i + 1) == '^'
+                                HamField = [HamField(1:i),'.',HamField((i+1):len)];
+                            end
+                    end
                     try
                         f = str2func(['@(x)',HamField]);
                         f(1); 
@@ -84,7 +90,6 @@ classdef integral_tab < matlab.apps.AppBase
         % Code that executes after component creation
         function startupFcn(app)
             app.IntegralKQField.Visible = 'off';
-            app.IntegralPlotField.Visible = 'off';
             app.IntegralNhapXField.Visible = 'off';
             app.IntegralNhapYField.Visible = 'off';
             app.NhpdyxEditFieldLabel.Visible = 'off';
@@ -146,9 +151,8 @@ classdef integral_tab < matlab.apps.AppBase
                     sum = sum *  3/8 * h;
                     end
                     sum = double(sum);
-                    disp(sum);
                     app.IntegralKQField.Visible = 'on';
-                    app.IntegralKQField.Text = ['$\int_{',num2str(a),'}^',num2str(b),'f(x)dx$ = ',num2str(sum)];
+                    app.IntegralKQField.Text = {['$Với$ $a = $',num2str(a)],['$Với$ $b = $',num2str(b)],['$\int_{a}^bf(x)dx$ = ',num2str(sum)]};
                     x = a:h:b;
                     y = f(x);
                     stem(app.IntegralPlotField,x,y);
