@@ -26,6 +26,23 @@ classdef derivative_tab < matlab.apps.AppBase
         DeriTextWarningMethodInput  matlab.ui.control.Label
         DeriButton                  matlab.ui.control.Button
         IntegralTab                 matlab.ui.container.Tab
+        IntegralNhapHamField        matlab.ui.control.EditField
+        NhphmfxLabel                matlab.ui.control.Label
+        IntegralNhapNField          matlab.ui.control.NumericEditField
+        NhpNEditFieldLabel          matlab.ui.control.Label
+        IntegralSelectOption        matlab.ui.control.DropDown
+        PhngPhpLabel                matlab.ui.control.Label
+        IntegralKQField             matlab.ui.control.Label
+        IntegralNhapYField          matlab.ui.control.EditField
+        NhpdyyEditFieldLabel        matlab.ui.control.Label
+        IntegralNhapXField          matlab.ui.control.EditField
+        NhpdyxEditFieldLabel        matlab.ui.control.Label
+        IntegralInputField          matlab.ui.control.DropDown
+        CchnhpDropDownLabel         matlab.ui.control.Label
+        IntegralNhapCanField        matlab.ui.control.EditField
+        NhpcnEditFieldLabel         matlab.ui.control.Label
+        IntegralResultButton        matlab.ui.control.Button
+        IntegralPlotField           matlab.ui.control.UIAxes
         ApproximationTab            matlab.ui.container.Tab
         InterpolationTab            matlab.ui.container.Tab
         HoiQuyTab                   matlab.ui.container.Tab
@@ -131,6 +148,7 @@ classdef derivative_tab < matlab.apps.AppBase
                 argName = 'num';
                 validationFcn = @(x) isnumeric(x) && ~isnan(x);
                 addRequired(p,argName,validationFcn)
+                % Check if inputs are number
                 for i = 1:length(xa)
                     parse(p, xa(i))
                     parse(p, ya(i))
@@ -139,7 +157,7 @@ classdef derivative_tab < matlab.apps.AppBase
                 error("Nhập x/y không đúng format, x/y không có kích thước giống nhau hoặc đang để trống")
             end
         end
-        
+
         function results = Ham_Lagrange(xa,ya)
             syms x;
             n = length(xa);
@@ -156,11 +174,79 @@ classdef derivative_tab < matlab.apps.AppBase
             end
             results(x) = results;
         end
+
+        function [CanValue,f,loi] = check_error(~,OptionInput,x,y,HamField,CanField,N)
+            if isempty(CanField) %xử lý lỗi ô cận
+                error('Không để trống ô cận');
+            elseif (CanField(1) ~= '[' || CanField(strlength(CanField)) ~= ']' )
+                error('Vui lòng đúng format [a;b] hoặc [a,b]');
+            elseif isempty(str2num(CanField(2:strlength(CanField)-1)))
+                error('Vui lòng nhập ký tự số');
+            else
+                CanValue = str2num(CanField(2:strlength(CanField)-1));
+            end
+            if  isempty(N)
+                error('Không để trống ô N');
+            end
+            if ~OptionInput
+                if  isempty(HamField)
+                    error('Không để trống hàm');
+                else
+                    len = length(HamField);
+                    for i = 1: (len- 1)
+                            if HamField(i) ~= '.' &&  HamField(i + 1) == '^'
+                                HamField = [HamField(1:i),'.',HamField((i+1):len)];
+                            end
+                    end
+                    try
+                        f = str2func(['@(x)',HamField]);
+                        f(1); 
+                    catch
+                        error('Nhập hàm không đúng format của Matlab');
+                    end
+                end
+            else
+                if isempty(x) || isempty(y)
+                    error('Không để trống x,y ');
+                elseif length(str2num(x)) ~= length(str2num(y))
+                    error('x,y phải nhập đúng format là a,b,c và kích thước bằng nhau');
+                else
+                    xa = str2num(x);
+                    ya = str2num(y);
+                    f = Ham_Lagrange(xa,ya);
+                end
+            end
+            loi = 0; %khong xay ra loi
+        end
+        
+        function [value,continuous] = Check_continuous(~,f,a,b,N)
+            value = 0;
+            continuous = 1;
+            step = (b-a)/N;
+            x = a:step:b;
+            for i = 1:N
+                if ~isfinite(f(x(i)))
+                    continuous = 0;
+                    value = x(i);
+                    break;
+                end
+            end
+        end
     end
     
 
     % Callbacks that handle component events
     methods (Access = private)
+
+        % Code that executes after component creation
+        function startupFcn(app)
+            app.IntegralKQField.Visible = 'off';
+            app.IntegralNhapXField.Visible = 'off';
+            app.IntegralNhapYField.Visible = 'off';
+            app.NhpdyxEditFieldLabel.Visible = 'off';
+            app.NhpdyyEditFieldLabel.Visible = 'off';
+            app.IntegralKQField.Interpreter = 'latex';
+        end
 
         % Button pushed function: DeriButton
         function DeriButtonPushed(app, event)
@@ -179,7 +265,6 @@ classdef derivative_tab < matlab.apps.AppBase
                         % xa, xy are params for the function to get
                         % functionStr
                         functionStr = string(Ham_Lagrange(xa,ya));
-                        % error("Chưa có hàm nội suy, thiết kế sau")
                 end
                 % Get inputs
                 stepValue = app.DeriStepValue.Value;
@@ -190,11 +275,21 @@ classdef derivative_tab < matlab.apps.AppBase
                 checkValidInputs(app, stepValue, functionStr, method, trunError);
                 functionHandler = getFunctionHandler(app, functionStr);
                 displayResult(app, app.appendStr, "[INFO]: Đã nhập f(x) = " + functionStr);
+                % Check continuous property of the function
+                funSyms = str2sym(functionStr);
+                symsVariable = symvar(funSyms);
+                if isnan(limit(funSyms, symsVariable, xValue))
+                    error("Hàm số không liên tục tại x = " + xValue)
+                end
                 % Call the truncation error func based on user input
                 if trunError == '1'
                     result = calcTrunErrorOH(app, method, functionHandler, xValue, stepValue);
                 else
                     result = calcTrunErrorOHH(app, method, functionHandler, xValue, stepValue);
+                end
+                % Check if result is complex
+                if ~(isreal(result))
+                    error("Hàm số không xác định tại x = " + xValue)
                 end
                 % Display f(x) result
                 displayResult(app, app.appendStr, "[INFO]: Kết quả f '(x) = " + string(result))
@@ -265,6 +360,86 @@ classdef derivative_tab < matlab.apps.AppBase
                     app.GioiThieuLabelMission_1.Value = "Hỗ trợ debug code";
                     app.GioiThieuLabelMission_2.Value = "Thực hiện tab nghiệm, nội suy";
                     app.GioiThieuLabelMission_3.Value = "100%";
+            end
+        end
+
+        % Button pushed function: IntegralResultButton
+        function IntegralResultButtonPushed(app, event)
+            %thông báo lỗi
+            loi = 1;
+            hamField = app.IntegralNhapHamField.Value;
+            optionInput = str2num(app.IntegralInputField.Value);
+            optionIntegral = str2num(app.IntegralSelectOption.Value);
+            canField = app.IntegralNhapCanField.Value;
+            X = app.IntegralNhapXField.Value;
+            Y = app.IntegralNhapYField.Value;
+            N = app.IntegralNhapNField.Value;
+            try
+                [CanValue,f,loi] = check_error(app,optionInput,X,Y,hamField,canField,N);
+            catch er
+                 app.IntegralKQField.Visible = 'on';
+                 app.IntegralKQField.Text = ['[ERROR]: ' , er.message];
+            end
+        if loi == 0
+            try
+            a = CanValue(1);
+            b = CanValue(2);
+            [value,continous] = Check_continuous(app,f,a,b,N);
+            if continous
+                %tính
+                    sum = f(a) + f(b);
+                    h = (b-a)/N;
+                    if ~optionIntegral
+                        for i = 1:(N - 1)
+                            sum = sum + 2*f(a+i*h);
+                        end
+                        sum = sum * h / 2;
+                    elseif  optionIntegral == 1
+                        for i = 1:(N - 1)
+                            sum = sum + 2*(mod(i,2) + 1)*f(a+i*h);
+                        end
+                        sum = sum * h / 3;
+                    else
+                        for i = 1:(N - 1)
+                            coef = ~mod(i,3)*2 + (1 - ~mod(i,3))*3;
+                            sum = sum + coef*f(a+i*h);
+                        end     
+                    sum = sum *  3/8 * h;
+                    end
+                    sum = double(sum);
+                    app.IntegralKQField.Visible = 'on';
+                    app.IntegralKQField.Text = {['$Với$ $a = $',num2str(a)],['$Với$ $b = $',num2str(b)],['$\int_{a}^bf(x)dx$ = ',num2str(sum)]};
+                    x = a:h:b;
+                    y = f(x);
+                    stem(app.IntegralPlotField,x,y);
+                    app.IntegralPlotField.Visible = 'on';
+            else
+                app.IntegralKQField.Visible = 'on';
+                app.IntegralKQField.Text = ['[ERROR] $f(x)$ không liên tục tại $x = ',num2str(value)];
+            end
+            catch
+                app.IntegralKQField.Text = '[ERROR] Lỗi ngoài ý muốn xảy ra';
+            end
+        end
+        end
+
+        % Value changed function: IntegralInputField
+        function IntegralInputFieldValueChanged(app, event)
+            value = app.IntegralInputField.Value;
+            if value == '0' 
+                app.IntegralNhapYField.Visible = 'off';
+                app.NhpdyxEditFieldLabel.Visible = 'off';
+                app.IntegralNhapXField.Visible = 'off';
+                app.NhpdyyEditFieldLabel.Visible = 'off';
+                app.IntegralNhapHamField.Visible = 'on';
+                app.NhphmfxLabel.Visible = 'on';
+            else
+                app.IntegralNhapHamField.Visible = 'off';
+                app.NhphmfxLabel.Visible = 'off';
+                app.NhpdyxEditFieldLabel.Visible = 'on';
+                app.IntegralNhapYField.Visible = 'on';
+                app.NhpdyyEditFieldLabel.Visible = 'on';             
+                app.IntegralNhapXField.Visible = 'on';
             end
         end
     end
@@ -421,6 +596,131 @@ classdef derivative_tab < matlab.apps.AppBase
             app.IntegralTab = uitab(app.TabGroup);
             app.IntegralTab.AutoResizeChildren = 'off';
             app.IntegralTab.Title = 'Tích phân';
+
+            % Create IntegralPlotField
+            app.IntegralPlotField = uiaxes(app.IntegralTab);
+            title(app.IntegralPlotField, 'Đồ thị của hàm số')
+            xlabel(app.IntegralPlotField, 'X')
+            ylabel(app.IntegralPlotField, 'Y')
+            zlabel(app.IntegralPlotField, 'Z')
+            app.IntegralPlotField.XGrid = 'on';
+            app.IntegralPlotField.YGrid = 'on';
+            app.IntegralPlotField.Position = [334 162 300 215];
+
+            % Create IntegralResultButton
+            app.IntegralResultButton = uibutton(app.IntegralTab, 'push');
+            app.IntegralResultButton.ButtonPushedFcn = createCallbackFcn(app, @IntegralResultButtonPushed, true);
+            app.IntegralResultButton.FontSize = 14;
+            app.IntegralResultButton.Position = [157 75 100 24];
+            app.IntegralResultButton.Text = 'Tìm kết quả';
+
+            % Create NhpcnEditFieldLabel
+            app.NhpcnEditFieldLabel = uilabel(app.IntegralTab);
+            app.NhpcnEditFieldLabel.HorizontalAlignment = 'right';
+            app.NhpcnEditFieldLabel.FontSize = 14;
+            app.NhpcnEditFieldLabel.Position = [61 248 65 22];
+            app.NhpcnEditFieldLabel.Text = 'Nhập cận';
+
+            % Create IntegralNhapCanField
+            app.IntegralNhapCanField = uieditfield(app.IntegralTab, 'text');
+            app.IntegralNhapCanField.HorizontalAlignment = 'right';
+            app.IntegralNhapCanField.FontSize = 14;
+            app.IntegralNhapCanField.Position = [141 248 119 22];
+            app.IntegralNhapCanField.Value = '[0;1]';
+
+            % Create CchnhpDropDownLabel
+            app.CchnhpDropDownLabel = uilabel(app.IntegralTab);
+            app.CchnhpDropDownLabel.HorizontalAlignment = 'right';
+            app.CchnhpDropDownLabel.FontSize = 14;
+            app.CchnhpDropDownLabel.Position = [39 355 84 22];
+            app.CchnhpDropDownLabel.Text = 'Cách nhập';
+
+            % Create IntegralInputField
+            app.IntegralInputField = uidropdown(app.IntegralTab);
+            app.IntegralInputField.Items = {'Nhập f(x)', 'Nhập x,y'};
+            app.IntegralInputField.ItemsData = {'0', '1'};
+            app.IntegralInputField.ValueChangedFcn = createCallbackFcn(app, @IntegralInputFieldValueChanged, true);
+            app.IntegralInputField.FontSize = 14;
+            app.IntegralInputField.Position = [141 355 122 22];
+            app.IntegralInputField.Value = '0';
+
+            % Create NhpdyxEditFieldLabel
+            app.NhpdyxEditFieldLabel = uilabel(app.IntegralTab);
+            app.NhpdyxEditFieldLabel.HorizontalAlignment = 'right';
+            app.NhpdyxEditFieldLabel.FontSize = 14;
+            app.NhpdyxEditFieldLabel.Position = [48 323 76 22];
+            app.NhpdyxEditFieldLabel.Text = 'Nhập dãy x';
+
+            % Create IntegralNhapXField
+            app.IntegralNhapXField = uieditfield(app.IntegralTab, 'text');
+            app.IntegralNhapXField.HorizontalAlignment = 'right';
+            app.IntegralNhapXField.FontSize = 14;
+            app.IntegralNhapXField.Position = [141 323 119 22];
+            app.IntegralNhapXField.Value = '0,1,2,3';
+
+            % Create NhpdyyEditFieldLabel
+            app.NhpdyyEditFieldLabel = uilabel(app.IntegralTab);
+            app.NhpdyyEditFieldLabel.HorizontalAlignment = 'right';
+            app.NhpdyyEditFieldLabel.FontSize = 14;
+            app.NhpdyyEditFieldLabel.Position = [50 282 76 22];
+            app.NhpdyyEditFieldLabel.Text = 'Nhập dãy y';
+
+            % Create IntegralNhapYField
+            app.IntegralNhapYField = uieditfield(app.IntegralTab, 'text');
+            app.IntegralNhapYField.HorizontalAlignment = 'right';
+            app.IntegralNhapYField.FontSize = 14;
+            app.IntegralNhapYField.Position = [141 282 119 22];
+            app.IntegralNhapYField.Value = '0,1,4,9';
+
+            % Create IntegralKQField
+            app.IntegralKQField = uilabel(app.IntegralTab);
+            app.IntegralKQField.BackgroundColor = [1 1 1];
+            app.IntegralKQField.VerticalAlignment = 'top';
+            app.IntegralKQField.WordWrap = 'on';
+            app.IntegralKQField.Position = [362 52 272 69];
+            app.IntegralKQField.Text = '';
+
+            % Create PhngPhpLabel
+            app.PhngPhpLabel = uilabel(app.IntegralTab);
+            app.PhngPhpLabel.HorizontalAlignment = 'right';
+            app.PhngPhpLabel.FontSize = 14;
+            app.PhngPhpLabel.Position = [30 212 93 22];
+            app.PhngPhpLabel.Text = 'Phương Pháp';
+
+            % Create IntegralSelectOption
+            app.IntegralSelectOption = uidropdown(app.IntegralTab);
+            app.IntegralSelectOption.Items = {'Hình thang', 'Simpson 1/3', 'Simpson 3/8'};
+            app.IntegralSelectOption.ItemsData = {'0', '1', '2'};
+            app.IntegralSelectOption.FontSize = 14;
+            app.IntegralSelectOption.Position = [141 212 119 22];
+            app.IntegralSelectOption.Value = '1';
+
+            % Create NhpNEditFieldLabel
+            app.NhpNEditFieldLabel = uilabel(app.IntegralTab);
+            app.NhpNEditFieldLabel.HorizontalAlignment = 'right';
+            app.NhpNEditFieldLabel.FontSize = 14;
+            app.NhpNEditFieldLabel.Position = [30 169 89 22];
+            app.NhpNEditFieldLabel.Text = 'Nhập N';
+
+            % Create IntegralNhapNField
+            app.IntegralNhapNField = uieditfield(app.IntegralTab, 'numeric');
+            app.IntegralNhapNField.FontSize = 14;
+            app.IntegralNhapNField.Position = [141 169 119 22];
+            app.IntegralNhapNField.Value = 100;
+
+            % Create NhphmfxLabel
+            app.NhphmfxLabel = uilabel(app.IntegralTab);
+            app.NhphmfxLabel.HorizontalAlignment = 'right';
+            app.NhphmfxLabel.FontSize = 14;
+            app.NhphmfxLabel.Position = [29 303 94 22];
+            app.NhphmfxLabel.Text = 'Nhập hàm f(x)';
+
+            % Create IntegralNhapHamField
+            app.IntegralNhapHamField = uieditfield(app.IntegralTab, 'text');
+            app.IntegralNhapHamField.HorizontalAlignment = 'right';
+            app.IntegralNhapHamField.FontSize = 14;
+            app.IntegralNhapHamField.Position = [141 303 119 22];
+            app.IntegralNhapHamField.Value = 'x.^2';
 
             % Create ApproximationTab
             app.ApproximationTab = uitab(app.TabGroup);
@@ -589,6 +889,9 @@ classdef derivative_tab < matlab.apps.AppBase
 
             % Register the app with App Designer
             registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            runStartupFcn(app, @startupFcn)
 
             if nargout == 0
                 clear app
