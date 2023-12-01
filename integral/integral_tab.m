@@ -127,40 +127,24 @@ classdef integral_tab < matlab.apps.AppBase
             [value,continous] = Check_continuous(app,f,a,b,N);
             if continous
                 %tính
-                    sum = f(a) + f(b);
-                    h = (b-a)/N;
                     if ~optionIntegral
-                        for i = 1:(N - 1)
-                            sum = sum + 2*f(a+i*h);
-                        end
-                        sum = sum * h / 2;
+                        [sum,h] = integral_hinhthang(f,a,b,N);
                     elseif  optionIntegral == 1
-                        for i = 1:(N - 1)
-                            sum = sum + 2*(mod(i,2) + 1)*f(a+i*h);
-                        end
-                        sum = sum * h / 3;
+                        [sum,h] = integral_simpson13(f,a,b,N);
                     else
-                        for i = 1:(N - 1)
-                            coef = ~mod(i,3)*2 + (1 - ~mod(i,3))*3;
-                            sum = sum + coef*f(a+i*h);
-                        end     
-                    sum = sum *  3/8 * h;
+                        [sum,h] = integral_simpson38(f,a,b,N);
                     end
                     sum = double(sum);
-                    app.IntegralKQField.Visible = 'on';
                     app.IntegralKQField.Text = {['$Với$ $a = $',num2str(a)],['$Với$ $b = $',num2str(b)],['$\int_{a}^bf(x)dx$ = ',num2str(sum)]};
                     x = a:h:b;
                     y = f(x);
                     stem(app.IntegralPlotField,x,y);
-                    app.IntegralPlotField.Visible = 'on';
 
             else
-                app.IntegralKQField.Visible = 'on';
                 app.IntegralKQField.Text = ['[ERROR] $f(x)$ không liên tục hoặc không xác định tại $x = ',num2str(value)];
             end
             catch ex
-                app.IntegralKQField.Visible = 'on';
-                app.IntegralKQField.Text = '[ERROR] Lỗi ngoài ý muốn xảy ra';
+                app.IntegralKQField.Text = ['[ERROR] ',ex.message];
             end
         end
         end
