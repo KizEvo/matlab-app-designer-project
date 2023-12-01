@@ -22,8 +22,8 @@ methods (Access = private)
     function [loi,X,Y] = check_error(~,x,y,option)
            if isempty(x) || isempty(y)
                  error('Không để trống x,y ');
-           elseif length(str2num(x)) ~= length(str2num(y))
-                 error('x,y phải nhập đúng format là a,b,c và kích thước bằng nhau');
+           elseif (length(str2num(x)) ~= length(str2num(y))) | isempty(str2num(x))
+                 error('x,y phải nhập đúng format là a,b,c với a,b,c là các con số và kích thước bằng nhau');
            else
                  X = str2num(x);
                  Y = str2num(y);
@@ -61,6 +61,10 @@ end
 
         % Button pushed function: RegressionButton
         function RegressionButtonPushed(app, event)
+            app.RegressionResult.Visible = 1;
+            app.RegressionResult.Text = ["Calculating..."];
+            cla(app.RegressionAxes);
+            pause(1);
             x_char = app.RegressionInputX.Value;
             y_char = app.RegressionInputY.Value;
             option = app.RegressionMethod.Value;
@@ -69,85 +73,20 @@ end
             try
                 [loi,x_num,y_num] = check_error(app,x_char,y_char,option);
             catch er
-                 app.RegressionResult.Visible = 'on';
                  app.RegressionResult.Text = ['[ERROR]: ' , er.message];
             end
             syms x;
-
             if loi == 0
                 try
                 if option == '0'
-                    x_data = x_num;
-                    y_data = y_num;
-                    n = length(x_data);
-                    sumx = sum(x_data);
-                    sumy = sum(y_data);
-                    sumxy = sum(x_data.*y_data);
-                    sumx2 = sum(x_data.^2);
-                    x_tb = sumx / n;
-                    y_tb = sumy / n;
-                    a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
-                    a0 = y_tb - a1*x_tb;
-                    Sr = sum((y_data-a0-a1*x_data).^2);
-                    St = sum((y_data-y_tb).^2);
-                    r2 = (St - Sr) / St;
-                    f = @(x) (a0 + a1*x);
+                    [f,r2] = Regression_linear(x_num,y_num);
                 elseif option == '1'   % a*e^(b*x)
-                    x_data = x_num;
-                    y_data = log(y_num);
-                    n = length(x_data);
-                    sumx = sum(x_data);
-                    sumy = sum(y_data);
-                    sumxy = sum(x_data.*y_data);
-                    sumx2 = sum(x_data.^2);
-                    x_tb = sumx / n;
-                    y_tb = sumy / n;
-                    a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
-                    a0 = y_tb - a1*x_tb;
-                    beta = a1;
-                    alpha = exp(a0);
-                    f = @(x) (alpha.*exp(x*beta));                    
-                    Sr = sum((y_data-a0-a1*x_data).^2);
-                    St = sum((y_data-y_tb).^2);
-                    r2 = (St - Sr) / St;
+                    [f,r2] = Regression_nonlinear_expx(x_num,y_num);
                 elseif option == '2'   % a*x^(b)
-                    x_data = log(x_num);
-                    y_data = log(y_num);
-                    n = length(x_data);
-                    sumx = sum(x_data);
-                    sumy = sum(y_data);
-                    sumxy = sum(x_data.*y_data);
-                    sumx2 = sum(x_data.^2);
-                    x_tb = sumx / n;
-                    y_tb = sumy / n;
-                    a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
-                    a0 = y_tb - a1*x_tb;
-                    beta = a1;
-                    alpha = 10^a0;
-                    f = @(x) (alpha*x^beta);    
-                    Sr = sum((y_data-a0-a1*x_data).^2);
-                    St = sum((y_data-y_tb).^2);
-                    r2 = (St - Sr) / St;
+                    [f,r2] = Regression_nonlinear_xpower(x_num,y_num);
                 else %  aln(x) + b
-                    x_data = log(x_num);
-                    y_data = y_num;
-                    n = length(x_data);
-                    sumx = sum(x_data);
-                    sumy = sum(y_data);
-                    sumxy = sum(x_data.*y_data);
-                    sumx2 = sum(x_data.^2);
-                    x_tb = sumx / n;
-                    y_tb = sumy / n;
-                    a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
-                    a0 = y_tb - a1*x_tb;
-                    beta = a0;
-                    alpha = a1;
-                    f = @(x) (alpha*log(x) + beta);    
-                    Sr = sum((y_data-a0-a1*x_data).^2);
-                    St = sum((y_data-y_tb).^2);
-                    r2 = (St - Sr) / St;
+                    [f,r2] = Regression_nonlinear_logarit(x_num,y_num);
                 end
-                app.RegressionResult.Visible = 'on';
                 fplot(app.RegressionAxes,f);
                 hold(app.RegressionAxes,'on');
                 scatter(app.RegressionAxes,x_num,y_num);
@@ -158,9 +97,9 @@ end
                 legend(app.RegressionAxes,'Predicted Value','True Value');
                 Giatridudoan = double(f(Dudoan));
                 app.RegressionResult.Text = {['Ket qua du doan: ',num2str(Giatridudoan)],['He so tuong quan: ',num2str(r2)]};
-                catch
-                app.RegressionResult.Text = '[ERROR]: Loi xay ra';
-                end
+            catch er
+                app.RegressionResult.Text = ['[ERROR]: ',er.message];
+            end
             end
         end
     end
