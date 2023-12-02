@@ -28,9 +28,11 @@ classdef integral_tab < matlab.apps.AppBase
             if isempty(CanField) %xử lý lỗi ô cận
                 error('Không để trống ô cận');
             elseif (CanField(1) ~= '[' || CanField(strlength(CanField)) ~= ']' )
-                error('Vui lòng đúng format [a;b] hoặc [a,b]');
+                error('Vui lòng đúng format [a;b], [a,b] hoặc [a b]');
             elseif isempty(str2num(CanField(2:strlength(CanField)-1)))
                 error('Vui lòng nhập ký tự số');
+            elseif length(str2num(CanField(2:strlength(CanField)-1))) ~= 2
+                error('Vui lòng đúng nhập 2 ký tự số');
             else
                 CanValue = str2num(CanField(2:strlength(CanField)-1));
             end
@@ -62,7 +64,7 @@ classdef integral_tab < matlab.apps.AppBase
                 else
                     xa = str2num(x);
                     ya = str2num(y);
-                    f = Ham_Lagrange(xa,ya);
+                    f = integral_hamLagrange(xa,ya);
                 end
             end
             loi = 0; %khong xay ra loi
@@ -74,7 +76,7 @@ classdef integral_tab < matlab.apps.AppBase
             step = (b-a)/N;
             x = a:step:b;
             for i = 1:N
-                if ~isfinite(f(x(i)))
+                if (~isfinite(f(x(i))) || ~isreal(f(x(i))))
                     continuous = 0;
                     value = x(i);
                     break;
@@ -97,20 +99,14 @@ classdef integral_tab < matlab.apps.AppBase
             app.IntegralKQField.Interpreter = 'latex';
         end
 
-        % Value changing function: IntegralNhapCanField
-        function IntegralNhapCanFieldValueChanging(app, event)
-
-        end
-
-        % Value changing function: IntegralNhapHamField
-        function IntegralNhapHamFieldValueChanging(app, event)
-
-        end
-
         % Button pushed function: IntegralResultButton
         function IntegralResultButtonPushed(app, event)
             %thông báo lỗi
             loi = 1;
+            app.IntegralKQField.Visible = 1;
+            app.IntegralKQField.Text = ["Calculating..."];
+            pause(1);
+            plot(app.IntegralPlotField,0,0);
             hamField = app.IntegralNhapHamField.Value;
             optionInput = str2num(app.IntegralInputField.Value);
             optionIntegral = str2num(app.IntegralSelectOption.Value);
@@ -125,44 +121,30 @@ classdef integral_tab < matlab.apps.AppBase
                  app.IntegralKQField.Text = ['[ERROR]: ' , er.message];
             end
         if loi == 0
+            try
             a = CanValue(1);
             b = CanValue(2);
             [value,continous] = Check_continuous(app,f,a,b,N);
             if continous
                 %tính
-                try
-                    sum = f(a) + f(b);
-                    h = (b-a)/N;
                     if ~optionIntegral
-                        for i = 1:(N - 1)
-                            sum = sum + 2*f(a+i*h);
-                        end
-                        sum = sum * h / 2;
+                        [sum,h] = integral_hinhthang(f,a,b,N);
                     elseif  optionIntegral == 1
-                        for i = 1:(N - 1)
-                            sum = sum + 2*(mod(i,2) + 1)*f(a+i*h);
-                        end
-                        sum = sum * h / 3;
+                        [sum,h] = integral_simpson13(f,a,b,N);
                     else
-                        for i = 1:(N - 1)
-                            coef = ~mod(i,3)*2 + (1 - ~mod(i,3))*3;
-                            sum = sum + coef*f(a+i*h);
-                        end     
-                    sum = sum *  3/8 * h;
+                        [sum,h] = integral_simpson38(f,a,b,N);
                     end
                     sum = double(sum);
-                    app.IntegralKQField.Visible = 'on';
                     app.IntegralKQField.Text = {['$Với$ $a = $',num2str(a)],['$Với$ $b = $',num2str(b)],['$\int_{a}^bf(x)dx$ = ',num2str(sum)]};
                     x = a:h:b;
                     y = f(x);
                     stem(app.IntegralPlotField,x,y);
-                    app.IntegralPlotField.Visible = 'on';
-                catch
-                    app.IntegralKQField.Text = '[ERROR] Lỗi ngoài ý muốn xảy ra';
-                end
+
             else
-                app.IntegralKQField.Visible = 'on';
-                app.IntegralKQField.Text = ['[ERROR] $f(x)$ không liên tục tại $x = ',num2str(value)];
+                app.IntegralKQField.Text = ['[ERROR] $f(x)$ không liên tục hoặc không xác định tại $x = ',num2str(value)];
+            end
+            catch ex
+                app.IntegralKQField.Text = ['[ERROR] ',ex.message];
             end
         end
         end
@@ -240,7 +222,6 @@ classdef integral_tab < matlab.apps.AppBase
 
             % Create IntegralNhapHamField
             app.IntegralNhapHamField = uieditfield(app.IntegralFigure, 'text');
-            app.IntegralNhapHamField.ValueChangingFcn = createCallbackFcn(app, @IntegralNhapHamFieldValueChanging, true);
             app.IntegralNhapHamField.HorizontalAlignment = 'right';
             app.IntegralNhapHamField.FontSize = 14;
             app.IntegralNhapHamField.Position = [149 302 119 22];
@@ -255,7 +236,6 @@ classdef integral_tab < matlab.apps.AppBase
 
             % Create IntegralNhapCanField
             app.IntegralNhapCanField = uieditfield(app.IntegralFigure, 'text');
-            app.IntegralNhapCanField.ValueChangingFcn = createCallbackFcn(app, @IntegralNhapCanFieldValueChanging, true);
             app.IntegralNhapCanField.HorizontalAlignment = 'right';
             app.IntegralNhapCanField.FontSize = 14;
             app.IntegralNhapCanField.Position = [149 247 119 22];
