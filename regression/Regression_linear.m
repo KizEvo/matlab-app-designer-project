@@ -1,4 +1,4 @@
-function [f,f_text,r2] = Regression_linear(x_num,y_num)
+function [f,f_text,r2] = regression_linear(x_num,y_num)
     x_data = x_num;
     y_data = y_num;
     n = length(x_data);
