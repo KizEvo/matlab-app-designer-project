@@ -77,15 +77,18 @@ end
             end
             syms x;
             if loi == 0
-                try
+            try
                 if option == '0'
-                    [f,r2] = Regression_linear(x_num,y_num);
+                    [f,f_text,r2] = Regression_linear(x_num,y_num);
                 elseif option == '1'   % a*e^(b*x)
-                    [f,r2] = Regression_nonlinear_expx(x_num,y_num);
+                    [f,f_text,r2] = Regression_nonlinear_expx(x_num,y_num);
                 elseif option == '2'   % a*x^(b)
-                    [f,r2] = Regression_nonlinear_xpower(x_num,y_num);
+                    [f,f_text,r2] = Regression_nonlinear_xpower(x_num,y_num);
                 else %  aln(x) + b
-                    [f,r2] = Regression_nonlinear_logarit(x_num,y_num);
+                    [f,f_text,r2] = Regression_nonlinear_logarit(x_num,y_num);
+                end
+                if ( ~isreal(f(Dudoan)) || ~isfinite(f(Dudoan)))
+                    error('Hàm số hổi quy không xác định với giá trị dự đoán');
                 end
                 fplot(app.RegressionAxes,f);
                 hold(app.RegressionAxes,'on');
@@ -96,7 +99,7 @@ end
                 hold(app.RegressionAxes,'off');
                 legend(app.RegressionAxes,'Predicted Value','True Value');
                 Giatridudoan = double(f(Dudoan));
-                app.RegressionResult.Text = {['Ket qua du doan: ',num2str(Giatridudoan)],['He so tuong quan: ',num2str(r2)]};
+                app.RegressionResult.Text = {['Kết quả dự đoán: ',num2str(Giatridudoan)],['Hệ số tương quan: ',num2str(r2)],['f(x) = ',f_text]};
             catch er
                 app.RegressionResult.Text = ['[ERROR]: ',er.message];
             end

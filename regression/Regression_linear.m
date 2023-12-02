@@ -1,4 +1,4 @@
-function [f,r2] = regression_linear(x_num,y_num)
+function [f,f_text,r2] = Regression_linear(x_num,y_num)
     x_data = x_num;
     y_data = y_num;
     n = length(x_data);
@@ -9,9 +9,12 @@ function [f,r2] = regression_linear(x_num,y_num)
     x_tb = sumx / n;
     y_tb = sumy / n;
     a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
-    a0 = y_tb - a1*x_tb;
+    a0 = y_tb - a1*x_tb;  
     Sr = sum((y_data-a0-a1*x_data).^2);
     St = sum((y_data-y_tb).^2);
     r2 = (St - Sr) / St;
     f = @(x) (a0 + a1*x);
+    a0_text = num2str(a0,'%.3f');
+    a1_text = num2str(a1,'%.3f');
+    f_text = [a0_text,' + x * ',a1_text];      
 end

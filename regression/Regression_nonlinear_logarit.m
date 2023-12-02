@@ -1,4 +1,4 @@
-function [f,r2] = regression_nonlinear_logarit(x_num,y_num)
+function [f,f_text,r2] = Regression_nonlinear_logarit(x_num,y_num)
     x_data = log(x_num);
     y_data = y_num;
     n = length(x_data);
@@ -12,7 +12,10 @@ function [f,r2] = regression_nonlinear_logarit(x_num,y_num)
     a0 = y_tb - a1*x_tb;
     beta = a0;
     alpha = a1;
-    f = @(x) (alpha*log(x) + beta);    
+    f = @(x) (alpha*log(x) + beta);
+    alpha_text = num2str(alpha,'%.3f');
+    beta_text = num2str(beta,'%.3f');
+    f_text = [alpha_text,' * ln(x) + ',beta_text];
     Sr = sum((y_data-a0-a1*x_data).^2);
     St = sum((y_data-y_tb).^2);
     r2 = (St - Sr) / St;
