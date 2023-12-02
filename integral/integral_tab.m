@@ -64,7 +64,7 @@ classdef integral_tab < matlab.apps.AppBase
                 else
                     xa = str2num(x);
                     ya = str2num(y);
-                    f = Ham_Lagrange(xa,ya);
+                    f = integral_hamLagrange(xa,ya);
                 end
             end
             loi = 0; %khong xay ra loi
