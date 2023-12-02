@@ -1,4 +1,4 @@
-function [f,f_text,r2] = regression_nonlinear_expx(x_num,y_num)     
+function [f,f_text,r2] = Regression_nonlinear_expx(x_num,y_num)     
     x_data = x_num;
     y_data = log(y_num);
     n = length(x_data);
