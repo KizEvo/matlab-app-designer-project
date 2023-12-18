@@ -23,114 +23,150 @@ classdef Interpolations_tab < matlab.apps.AppBase
 
     methods (Access = private)
 
-        function [xa,ya,x, emptyFlag] = dataInput(app)
-            emptyFlag = 0;
-            if isempty(app.Value4Interpolation.Value)
-                emptyFlag = 1; %o nhap x trong
-            else
-                xa = str2num(app.xDataField.Value);
-                ya = str2num(app.yDataField.Value);
-                x = app.Value4Interpolation.Value;
-
-                if length(xa)~=length(ya)
-                    app.ResultInter.Value = "2 mảng phải cùng kích thước" %2 mang khac kich thuoc
-                elseif length(xa) == 1
-                    app.ResultInter.Value = "Kích thước mảng phải lớn hơn 1" %2mang co 1 gia tri
+        function [xa,ya,x, emptyFlag] = checkEmpty(app)
+            try
+                emptyFlag = 0;
+                if isempty(app.Value4Interpolation.Value)
+                    x = 0;
+                elseif isempty(app.xDataField.Value) || isempty(app.yDataField.Value)
+                    app.ResultInter.Value = "Chưa nhập đủ dữ liệu";
                 else
-                    emptyFlag = 2; %%passed
+                    xa = str2num(app.xDataField.Value);
+                    ya = str2num(app.yDataField.Value);
+                    x = app.Value4Interpolation.Value;
+                    if isempty(xa) || isempty(ya)
+                        app.ResultInter.Value = "Kiểu dữ liệu đầu vào phải là số học"; 
+                    elseif length(xa)~=length(ya)
+                        app.ResultInter.Value = "2 mảng phải cùng kích thước"; %2 mang khac kich thuoc
+                    elseif length(xa) == 1
+                        app.ResultInter.Value = "Kích thước mảng phải lớn hơn 1"; %2mang co 1 gia tri
+                    elseif sum([~isfinite(xa),~isreal(xa),~isfinite(ya),~isreal(ya)])
+                        app.ResultInter.Value = "Mảng nhập vào chỉ là số thực";
+                    else
+                        emptyFlag = 1; %%passed
+                    end
                 end
+            catch
+                app.ResultInter.Value = "Kiểm tra lại dữ liệu nhập vào";
             end
         end
         %%%%%%%%%%%%%%%%%%%%%%%%
         function result = lagrangeMethodInterpolation(~, xa, ya, x)
-            sum = 0;
-            for i = 1: length(xa)
-                product = ya(i);
-                for j = 1: length(xa) 
-                    if i ~= j 
-                        product = product*(x - xa(i))/(xa(i) - xa(j));
+            try
+                sum = 0;
+                for i = 1: length(xa)
+                    product = 1;
+                    for j = 1: length(xa) 
+                        if j ~= i
+                            product = product*(x - xa(j))/(xa(i) - xa(j));
+                        end 
                     end 
+                    sum = sum + product*ya(i);
                 end 
-                sum = sum + product;
-            end 
-            result = sum;
+                result = num2str(sum);
+            catch
+                result = "Không tính được";
+            end
         end
 
         %%%%%%%%%%%%%%%%%%%%%%%%
-        
-        function result = newtonMethodInterpolation(~, xa, ya, x)
-            n= length(xa);
-            d = ya;
-            for i = 1:n
-                for j = 1:i-1
-                    d(i) = (d(j) -d(i)) / (xa(j) - xa(i));
-                end
-            end
-            
-            f = zeros(n,n);
-            f(:, 1) = ya;
-            for j = 2:n
-                for i = 1:n-j+1
-                    f(i,j) = (f(i+1,j-1) - f(i, j-1)) / (xa(i+j-1) - xa(i));
-                end
-            end
 
-            result = f(1,1);
-            for j = 2:n
-                term = 1;
-                for i = 1:j-1
-                    term = term * (x - xa(i));
+        %%%f
+        function result = newtonMethodInterpolation(~, xa, ya, x)
+            try
+                n = length(xa);
+                a(1) = ya(1);
+                for k = 1 : n - 1
+                   d(k, 1) = (ya(k+1) - ya(k))/(xa(k+1) - xa(k));
                 end
-                result = result + f(1,j)*term;
+                for j = 2 : n - 1
+                   for k = 1 : n - j
+                      d(k, j) = (d(k+1, j - 1) - d(k, j - 1))/(xa(k+j) - xa(k));
+                   end
+                end
+                for j = 2 : n
+                   a(j) = d(1, j-1);
+                end
+                Df(1) = 1;
+                c(1) = a(1);
+                for j = 2 : n
+                   Df(j)=(x - xa(j-1)) .* Df(j-1);
+                   c(j) = a(j) .* Df(j);
+                end
+                result = num2str(sum(c));
+            catch
+                result = "Không tính được";
             end
         end
+        %}
 
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function draw(app, xa, ya)
-            plot(app.UIAxes,xa,ya);
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        function draw(app , xa, ya, method)
+            try
+                syms x;
+                if method == 1
+                    f(x) = app.findLagrangeFuntion(xa, ya);
+                elseif method == 2
+                    f(x) = app.findNewtonFunction(xa, ya);
+                end
+                fplot(app.UIAxes, f);
+                x_min = min(xa) - (max(xa) - min(xa))/4;
+                x_max = max(xa) + (max(xa) - min(xa))/4;
+                xlim(app.UIAxes,[x_min x_max]);
+            catch
+                app.ResultInter.Value = "Lỗi vẽ đồ thị";
+            end
         end
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        
         function resultLagrange = findLagrangeFuntion(app, xData, yData)
-           syms x;
-           n = length(xData);
-           lagrangePolynomial = 0;
-
-           for i=1:n
-               Li = 1;
-               for j=1:n
-                   if j~=i
-                       Li = Li*(x -  xData(j)) / (xData(i) - xData(j));
-                   end
-               end
-               lagrangePolynomial = lagrangePolynomial +Li*yData(i);
-           end
-           resultLagrange = lagrangePolynomial;
+            try
+                syms x;
+                n = length(xData);
+                resultLagrange = 0;
+                for i = (1:n)
+                    temp = 1;
+                    for j = (1:n)
+                        if i ~= j
+                            temp = simplify( temp * ( (x - xData(j)) / (xData(i) - xData(j)))); 
+                        end
+                    end
+                    resultLagrange = resultLagrange + temp*yData(i);
+                end
+                resultLagrange(x) = resultLagrange;
+                digits(5);
+                resultLagrange(x) = resultLagrange;
+                collect(resultLagrange);
+                simplify(resultLagrange);
+                resultLagrange = vpa(resultLagrange); 
+            catch
+                app.ResultInter.Value = "Lỗi ngoài ý muốn" ;
+            end
         end
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function resultNewton = findNewtonFunction(~, xData, yData)
-            syms x;
-            n = length(xData);
-            d = yData;
-            for i = 1:n
-                for j = 1:i-1
-                    d(i) = (d(j) - d(i)) / (xData(j) - xData(i));
+        function resultNewton = findNewtonFunction(app, xData, yData)
+            try
+                syms x;
+                n = length(xData);
+                da = yData;
+                for i = 1:n
+                    for j = 1:(i-1)
+                        da(i) = (da(j) - da(i))/(xData(j) - xData(i));
+                    end
                 end
-            end
-            newtonPolynomial = d(1,1);
-
-            for i=2:n
-                term = 1;
-                for j=1:i-1
-                    term = term*(x-xData(j));
+                resultNewton = da(n);
+                for i = n-1:-1:1
+                    resultNewton = resultNewton * (x - xData(i)) + da(i);
                 end
-                newtonPolynomial = newtonPolynomial  + d(1,i) * term;
+                digits(5);
+                resultNewton(x) = resultNewton;
+                collect(resultNewton);
+                simplify(resultNewton);
+                resultNewton = vpa(resultNewton); 
+            catch
+                app.ResultInter.Value = "Lỗi ngoài ý muốn" ;
             end
-
-            resultNewton = newtonPolynomial;
         end
-
     end
 
      
@@ -143,41 +179,44 @@ classdef Interpolations_tab < matlab.apps.AppBase
 
         % Button pushed function: CalcButton1
         function CalcButton1Pushed(app, event)
-            [xa, ya, x, emptyFlag] = app.dataInput();
-            if emptyFlag == 2
-
-                syms x;
-                xData = str2num(app.xDataField.Value);
-                yData = str2num(app.yDataField.Value);
-    
-                if app.Method.ValueIndex == 2 && emptyFlag
-                    f(x) = app.findLagrangeFuntion(xData, yData);
-                    app.ResultInter.Value = "y = " + string(f);
-                    app.draw(xa, ya);
-                elseif app.Method.ValueIndex == 1 && emptyFlag
-                    f(x) = app.findNewtonFunction(xData, yData);
-                    app.ResultInter.Value = "y = " + string(f);
-                    app.draw(xa, ya);
-                end
-            
-            end            
-
+            app.ResultInter.Value = "";
+            plot(app.UIAxes,0);
+            try
+                [xa, ya, x, emptyFlag] = app.checkEmpty();
+                if emptyFlag == 1
+                    syms x;
+                    xData = xa;
+                    yData = ya;
+                    if app.Method.Value == "Lagrange" && emptyFlag
+                        f(x) = app.findLagrangeFuntion(xData, yData);
+                        app.ResultInter.Value = "y = " + string(collect(f(x)));
+                        app.draw(xData, yData, 1);
+                    elseif app.Method.Value == "Newton" && emptyFlag
+                        f(x) = app.findNewtonFunction(xData, yData);
+                        app.ResultInter.Value = "y = " + string(collect(f(x)));
+                        app.draw(xData, yData, 2);
+                    end
+                end           
+            catch 
+               app.ResultInter.Value = "Lỗi ngoài ý muốn";
+            end
         end
 
         % Button pushed function: CalcButton2
         function CalcButton2Pushed(app, event)
-         
-            [xa, ya, x, emptyFlag] = app.dataInput();
-            if emptyFlag == 1 &&  app.Method.ValueIndex == 2
-                result = app.newtonMethodInterpolation(xa, ya, x);  
-                app.ResultInter2.Value = num2str(result);
-                app.draw(xa, ya);
-            elseif app.Method.ValueIndex == 2 && emptyFlag == 2
-                result = app.lagrangeMethodInterpolation(xa, ya, x);
-                app.ResultInter2.Value = num2str(result);
-                app.draw(xa, ya);
-            elseif emptyFlag == 1
-                app.ResultInter2.Value = "Nhập giá trị cần nội suy";
+            try
+                app.ResultInter2.Value = "";
+                [xa, ya, x, emptyFlag] = app.checkEmpty();
+               % app.ResultInter.Value = app.ResultInter.Value;
+                if app.Method.Value == "Newton"  && emptyFlag == 1
+                    result = app.newtonMethodInterpolation(xa, ya, x);  
+                    app.ResultInter2.Value = result;
+                elseif app.Method.Value == "Lagrange" && emptyFlag == 1
+                    result = app.lagrangeMethodInterpolation(xa, ya, x);
+                    app.ResultInter2.Value = result;
+                end
+            catch ex
+                app.ResultInter.Value = "Lỗi xảy ra do người dùng nhập không đúng input";
             end
         end
     end
@@ -199,6 +238,7 @@ classdef Interpolations_tab < matlab.apps.AppBase
             xlabel(app.UIAxes, 'x')
             ylabel(app.UIAxes, 'y')
             zlabel(app.UIAxes, 'Z')
+            app.UIAxes.Colormap = [];
             app.UIAxes.XGrid = 'on';
             app.UIAxes.YGrid = 'on';
             app.UIAxes.Position = [272 169 322 261];
@@ -207,27 +247,31 @@ classdef Interpolations_tab < matlab.apps.AppBase
             app.NhpdliuxEditFieldLabel = uilabel(app.UIFigure);
             app.NhpdliuxEditFieldLabel.HorizontalAlignment = 'right';
             app.NhpdliuxEditFieldLabel.FontSize = 14;
-            app.NhpdliuxEditFieldLabel.Position = [33 374 96 22];
+            app.NhpdliuxEditFieldLabel.Position = [9 374 96 22];
             app.NhpdliuxEditFieldLabel.Text = 'Nhập dữ liệu x';
 
             % Create xDataField
             app.xDataField = uieditfield(app.UIFigure, 'text');
             app.xDataField.Tag = 'xDataField';
+            app.xDataField.HorizontalAlignment = 'right';
             app.xDataField.FontSize = 14;
-            app.xDataField.Position = [144 374 100 22];
+            app.xDataField.Position = [125 374 119 22];
+            app.xDataField.Value = '0.1, 0.2, 0.3, 0.4';
 
             % Create NhpdliuyEditFieldLabel
             app.NhpdliuyEditFieldLabel = uilabel(app.UIFigure);
             app.NhpdliuyEditFieldLabel.HorizontalAlignment = 'right';
             app.NhpdliuyEditFieldLabel.FontSize = 14;
-            app.NhpdliuyEditFieldLabel.Position = [33 300 96 22];
+            app.NhpdliuyEditFieldLabel.Position = [10 300 95 22];
             app.NhpdliuyEditFieldLabel.Text = 'Nhập dữ liệu y';
 
             % Create yDataField
             app.yDataField = uieditfield(app.UIFigure, 'text');
             app.yDataField.Tag = 'yDataField';
+            app.yDataField.HorizontalAlignment = 'right';
             app.yDataField.FontSize = 14;
-            app.yDataField.Position = [144 300 100 22];
+            app.yDataField.Position = [125 300 119 22];
+            app.yDataField.Value = '0.09983, 0.19867, 0.29552, 0.38942';
 
             % Create PhngphpDropDownLabel
             app.PhngphpDropDownLabel = uilabel(app.UIFigure);
@@ -255,13 +299,13 @@ classdef Interpolations_tab < matlab.apps.AppBase
             app.KtquathcnisuyTextAreaLabel = uilabel(app.UIFigure);
             app.KtquathcnisuyTextAreaLabel.HorizontalAlignment = 'right';
             app.KtquathcnisuyTextAreaLabel.FontSize = 14;
-            app.KtquathcnisuyTextAreaLabel.Position = [9 120 153 22];
+            app.KtquathcnisuyTextAreaLabel.Position = [9 103 153 22];
             app.KtquathcnisuyTextAreaLabel.Text = 'Kết quả đa thức nội suy';
 
             % Create ResultInter
             app.ResultInter = uitextarea(app.UIFigure);
             app.ResultInter.FontSize = 14;
-            app.ResultInter.Position = [176 118 137 26];
+            app.ResultInter.Position = [176 83 137 61];
 
             % Create CalcButton2
             app.CalcButton2 = uibutton(app.UIFigure, 'push');
@@ -274,13 +318,13 @@ classdef Interpolations_tab < matlab.apps.AppBase
             app.KtqunisuyLabel = uilabel(app.UIFigure);
             app.KtqunisuyLabel.HorizontalAlignment = 'right';
             app.KtqunisuyLabel.FontSize = 14;
-            app.KtqunisuyLabel.Position = [392 45 104 22];
+            app.KtqunisuyLabel.Position = [392 46 104 22];
             app.KtqunisuyLabel.Text = 'Kết quả nội suy';
 
             % Create ResultInter2
             app.ResultInter2 = uitextarea(app.UIFigure);
             app.ResultInter2.FontSize = 14;
-            app.ResultInter2.Position = [504 43 90 26];
+            app.ResultInter2.Position = [504 44 90 25];
 
             % Create GitrcnnisuyEditFieldLabel
             app.GitrcnnisuyEditFieldLabel = uilabel(app.UIFigure);

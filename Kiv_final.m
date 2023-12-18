@@ -1,4 +1,4 @@
-classdef derivative_tab < matlab.apps.AppBase
+classdef Kiv_final < matlab.apps.AppBase
 
     % Properties that correspond to app components
     properties (Access = public)
@@ -323,7 +323,7 @@ classdef derivative_tab < matlab.apps.AppBase
             sumy = sum(y_data);
             sumxy = sum(x_data.*y_data);
             sumx2 = sum(x_data.^2);
-            x_tb = sumx / n;
+            x_tb = sumx / n;d
             y_tb = sumy / n;
             a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
             a0 = y_tb - a1*x_tb;
@@ -1801,7 +1801,7 @@ classdef derivative_tab < matlab.apps.AppBase
     methods (Access = public)
 
         % Construct app
-        function app = derivative_tab
+        function app = Kiv_final
 
             % Create UIFigure and components
             createComponents(app)

@@ -2,164 +2,238 @@ classdef ApproximateValue_tab < matlab.apps.AppBase
 
     % Properties that correspond to app components
     properties (Access = public)
-        UIFigure                   matlab.ui.Figure
-        SecondLabel                matlab.ui.control.Label
-        ToleranceField             matlab.ui.control.NumericEditField
-        NhpsaisLabel               matlab.ui.control.Label
-        bField                     matlab.ui.control.NumericEditField
-        bEditFieldLabel            matlab.ui.control.Label
-        aField                     matlab.ui.control.NumericEditField
-        aEditFieldLabel            matlab.ui.control.Label
-        Loop                       matlab.ui.control.TextArea
-        SlnlpTextAreaLabel         matlab.ui.control.Label
-        Result                     matlab.ui.control.TextArea
-        KtquLabel                  matlab.ui.control.Label
-        CalcButton                 matlab.ui.control.Button
-        LoopFunctionField          matlab.ui.control.EditField
-        Label                      matlab.ui.control.Label
-        Method                     matlab.ui.control.DropDown
-        ChnphngphpDropDownLabel    matlab.ui.control.Label
-        FirstLabel                 matlab.ui.control.Label
-        FunctionField              matlab.ui.control.EditField
-        NhpphngtrnhEditFieldLabel  matlab.ui.control.Label
-        UIAxes                     matlab.ui.control.UIAxes
+        UIFigure                 matlab.ui.Figure
+        SecondLabel              matlab.ui.control.Label
+        ToleranceField           matlab.ui.control.NumericEditField
+        NhpsaisLabel             matlab.ui.control.Label
+        bField                   matlab.ui.control.NumericEditField
+        bEditFieldLabel          matlab.ui.control.Label
+        aField                   matlab.ui.control.NumericEditField
+        aEditFieldLabel          matlab.ui.control.Label
+        Loop                     matlab.ui.control.TextArea
+        SlnlpTextAreaLabel       matlab.ui.control.Label
+        Result                   matlab.ui.control.TextArea
+        KtquLabel                matlab.ui.control.Label
+        CalcButton               matlab.ui.control.Button
+        LoopFunctionField        matlab.ui.control.EditField
+        Label                    matlab.ui.control.Label
+        Method_2                 matlab.ui.control.DropDown
+        ChnphngphpDropDownLabel  matlab.ui.control.Label
+        FirstLabel               matlab.ui.control.Label
+        FunctionField            matlab.ui.control.EditField
+        NhphmLabel               matlab.ui.control.Label
+        UIAxes_2                 matlab.ui.control.UIAxes
     end
 
     
     methods (Access = private)
-        %%%Passed%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function checkEmptyField = checkEmpty(app)
-            if isempty(app.FunctionField.Value) 
-                checkEmptyField = 101;                
-            elseif isempty(app.aField.Value) || isempty(app.bField.Value)
-                checkEmptyField = 102;                
-            elseif isempty(app.ToleranceField.Value)
-                checkEmptyField = 103;
-            elseif isempty(app.LoopFunctionField.Value) && app.Method.ValueIndex == 2
-                checkEmptyField = 104;
+        %%%check_error%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        function [f,errorFlag] = error_check(app,a,b,tolerance,f_field)
+            %check_khoảng_phân_ly
+            if  isempty(a) || isempty(b)
+                error('Không để trống khoảng phân ly');
+            elseif a > b
+                error('a phải nhỏ hơn b');
+            end
+
+
+            %check_saiso
+            if isempty(tolerance)
+                error('Không để trống sai số');
+            elseif tolerance <= 0
+                error('Sai số phải lớn hơn 0');
+            elseif tolerance > (b - a) / 2
+                error('[Warning] Sai số quá lớn so với khoảng phân ly');
+            end
+
+
+            %check_loi_empty_va_tinh_lien_tuc_cua_ham
+            if isempty(f_field)
+                error('Không để trống hàm');
             else
-                checkEmptyField = 000;
+                try
+                    f = str2func(['@(x)', f_field]);
+                    f(0);
+                catch
+                    error('Hàm nhập sai định dạng Matlab');
+                end
+                valueToCheckContinuous = linspace(a,b);
+                for i = valueToCheckContinuous
+                    if ~isreal(f(i))
+                        error('Hàm nhập tồn tại giá trị phức');
+                    elseif ~isfinite(f(i))
+                        error(['Hàm nhập không xác định tại x = ',num2str(i)]);
+                    end
+                end
             end
+            %Check_loi_ve_tinh_don_dieu_cua_ham_so
+            syms x;
+            if f(a) * f(b) >= 0
+                fplot(app.UIAxes_2,f);
+                xlim(app.UIAxes_2,[a b]);
+                error('f(a) và f(b) phải trái dấu');
+            else
+                f_dh = diff(f(x));
+                result_diff = double(solve(f_dh == 0,x,"Real",true));
+                for i = transpose(result_diff)
+                    if (i > a) && (i < b)
+                        fplot(app.UIAxes_2,f);
+                        xlim(app.UIAxes_2,[a b]);
+                        error('Hàm số không đơn điệu trong khoảng (a,b)');
+                    end
+                end
+            end
+            errorFlag = 0;
         end
 
-        %%%passed%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%create input function & loop function 
-        function f = functInit(app)
-            try   
-                f = str2func("@(x)"+app.FunctionField.Value);
-            catch
-                app.Result.Value = "Nhập sai định dạng Matlab";
-            end
-        end
 
-        function f = loopFunctInit(app)
-            try   
-                f = str2func("@(x)"+app.LoopFunctionField.Value);
-            catch
-                app.Result.Value = "Nhập sai định dạng Matlab";
+        %%%hamlap%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+        function fl = loopFunctInit(~,fl_field,f,a,b)
+            syms x;
+            if isempty(fl_field)
+                error('Không để trống hàm lặp');
+            else
+                try
+                    fl = str2func("@(x)"+ fl_field);
+                    fl(0);
+                catch
+                    error('Hàm lặp sai định dạng Matlab');
+                end
+                valueToCheckContinuous = linspace(a,b);
+                for i = valueToCheckContinuous
+                    if ~isreal(fl(i)) || ~isfinite(fl(i))
+                        error(['Hàm lặp không xác định tại x = ', num2str(i)]);
+                    end
+                end
+            end
+            nghiemCheck = solve(f(x) == 0,"Real",true);
+            nghiemLoopCheck = solve(fl(x) == x,"Real",true);
+            checkDiff = setdiff(nghiemCheck,nghiemLoopCheck);
+            if ~isempty(checkDiff) & ( (checkDiff > a) | (checkDiff < b))
+                error('Hàm lặp phải là biến đổi từ hàm chính');
+            end
+            f_dh = str2func(['@(x)',char(diff(f(x)))]);
+            for i = linspace(a,b)
+                if f_dh(i) > 1
+                    error(['Hàm lặp không hội tụ vì có đạo hàm lớn hơn 1 tại x = ',num2str(i)]);
+                end
             end
         end
 
         %%%pased%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function bisectMethod(app, a, b, tolerance, loop)
-            f = app.functInit();
-            if f(a)*f(b) > 0 
-                app.Result.Value = "Vô nghiệm trong khoảng phân li";
-            else
-                c = (a + b) / 2;
-                if f(c)*f(a) >= 0 
-                    a = c;
+        function bisectMethod(app, f , a, b, tolerance, loop)
+            try
+                if loop >= 1000
+                    app.Result.Value = "Lỗi vào vòng lặp vô tận";
                 else
-                    b = c;
+                    c = (a + b) / 2;
+                    if f(c)*f(a) >= 0 || f(c) == 0
+                            a = c;
+                    else
+                            b = c;
+                    end
+                    if f(a) == 0
+                        e = 0;
+                    else
+                        e = b - a;
+                    end
+                    if e < tolerance
+                            app.Result.Value = num2str(a);
+                            app.Loop.Value = num2str(loop);
+                    else
+                            loop = loop + 1;
+                            bisectMethod(app,f, a, b, tolerance, loop);
+                    end
                 end
-                e = b - a;
-                if e < tolerance
-                    app.Result.Value = num2str(a);
-                    app.Loop.Value = num2str(loop);
-                else
-                    loop = loop + 1;
-                    bisectMethod(app, a, b, tolerance, loop);
-                end
+            catch er
+                app.Result.Value = er.message;
             end
-
         end
 
         %%%passed%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function loopMethod(app, fp, a, b, tolerance, loop)
-            firstValue = a;
-            secondValue = fp(firstValue);
-            b = firstValue;
-            a = secondValue;
-   
-            e = abs(secondValue - firstValue);
-
-            if e < tolerance
-                app.Result.Value = giaTriSau;
-                app.Loop.Value = loop;
-            else
-                loop = loop + 1;
-                loopMethod(app,fb, a, b, saiso, loop);
+        function loopMethod(app,fp, a, b, tolerance)
+            try
+                x_previous = b;
+                x = a;
+                times = 0 ;
+                while (abs(x - x_previous) >= tolerance )
+                    x_previous = x;
+                    x = fp(x_previous);
+                    times = times + 1;
+                    if ( x < a ) || (x > b) 
+                        error('Hàm lặp không hội tụ');
+                    end
+                    if times > 1000
+                        error('Vào vòng lặp vô tận');
+                    end
+                end
+                app.Result.Value = num2str(x);
+                app.Loop.Value = num2str(times);
+            catch er
+                app.Result.Value = er.message;
             end
         end
 
-        %%%checking
-        function  newtonMethod(app, a, b, tolerance, loop)
-            f = app.functInit();
+        %%%
+        function  newtonMethod(app,f, a, b, tolerance)
+           try
             syms x;
-            f_dh = str2func(["@(x)" ,char(diff(f(x)))]);
-            f_dh2 = str2func(["@(x)" ,char(diff(f_dh(x)))]);
-
+            fd1 = str2func(['@(x)', char(diff(f(x)))]);
             nostop = 1;
-            temp1 = double(solve(diff(f(x))));
-            temp2 = double(solve(diff(f_dh(x))));
-
-            %check f'(x)
+            temp1 = double(solve(diff(f(x)) == 0,'Real',true));
+            temp2 = double(solve(diff(fd1(x)) == 0,'Real',true));
+            %Kiem tra f'(x) co doi dau trong khoang phan li nghiem hay khong
             if ~isempty(temp1)
                 for i=1:length(temp1)
-                    if (temp1(i)<=b) && (temp1(i)>=a)
-                        nostop=0;
-                        app.Result.Value = "Không xác định";
-                        app.Loop.Value = "Không xác định";
-                        break;
+                    if (temp1(i)<b) && (temp1(i)>a)
+                        error(['Hàm đạo hàm cấp 1 của f đổi dấu trong khoảng phân ly nghiệm tại ',num2str(temp1(i))]);
                     end
                 end
             end
-            %check f"(x) 
+            %Kiem tra f"(x) co doi dau trong khoang phan li nghiem hay ko
             if ~isempty(temp2)
                 for i=1:length(temp2)
-                    if (temp2(i)<=b) && (temp2(i)>=a)
-                        nostop=0;
-                        app.Result.Value = "Không xác định";
-                        app.Loop.Value = "Không xác định";
-                        break;
+                    if (temp2(i)<b) && (temp2(i)>a)
+                        error(['Hàm đạo hàm cấp 2 của f đổi dấu trong khoảng phân ly nghiệm tại ',num2str(temp2(i))]);   
                     end
                 end
             end
-            if (nostop)
-                if (f_dh(a)*f_dh2(a)) <= 0
-                    newtonMethod(app, f, (a+b)/2, b, tolerance, loop);
-                else
-                    firstValue = a;
-                    secondValue = firstValue - f(firstValue)/f_dh(firstValue);
-                    e = abs(secondValue - firstValue);
-
-                    if e < tolerance
-                        app.Result.Value = secondValue+"";
-                        app.Loop.Value = loop+"";
-                    else
-                        loop = loop + 1;
-                        newtonMethod(app, f, secondValue, b, tolerance, loop);
+            if (nostop)  
+                f_dhc1 = str2func(['@(x)',char(diff(f(x)))]);
+                f_dhc2 = str2func(['@(x)',char(diff(f_dhc1(x)))]);
+                x0 = a;
+                while f(x0) * f_dhc2(x0) <= 0 
+                    x0 = (x0 + b) / 2;
+                end
+                xi_previous = x0;
+                xi = xi_previous - f(xi_previous)/f_dhc1(xi_previous);
+                times = 1;
+                while abs(xi - xi_previous) > tolerance
+                    xi_previous = xi;
+                    xi = xi_previous - f(xi_previous)/f_dhc1(xi_previous);
+                    times = times + 1;
+                    if times > 100
+                        error('Vòng lặp vô tận xảy ra');
                     end
-                end 
-            end
+                end
+                app.Result.Value = num2str(xi);
+                app.Loop.Value = num2str(times);
+             end
+           catch er
+                app.Result.Value = er.message;
+           end
         end
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %check startPoint & endPoint ?
-        function draw(app,f,a,b)
-            x = a:0.01:b;
-            y = f(x);
-            plot(app.UIAxes,x,y);
+        function approximationDraw(app,f,a,b)
+            try
+                fplot(app.UIAxes_2,f);
+                xlim(app.UIAxes_2,[a b]);
+            catch
+                app.Result.Value = "Không vẽ được hàm số";
+            end
         end
         
     end
@@ -170,63 +244,49 @@ classdef ApproximateValue_tab < matlab.apps.AppBase
 
         % Button pushed function: CalcButton
         function CalcButtonPushed(app, event)
-
-            %%%%check error before
-              passedFlag = 000; %%flag executes each task
-                switch app.checkEmpty()
-                  case 101
-                       app.Result.Value = "Hãy nhập hàm cần tính";
-                  case 102
-                       app.Result.Value = "Hãy nhập khoảng phân li nghiệm";
-                  case 103
-                       app.Result.Value = "Hãy nhập sai số cho phép";
-                  case 104
-                       app.Result.Value = "Hãy nhập hàm lặp";
-                  case 000
-                      passedFlag = 201;
-                end
-            % %%%%%%%%%%%%%%
-            % %%%calculate
-            % 
-            if passedFlag == 201
-                a = app.aField.Value;
-                b = app.bField.Value;
-                tolerance = app.ToleranceField.Value;
-
-                if app.Method.ValueIndex == 1
-                    app.bisectMethod(a, b, tolerance, 0);
-                    passedFlag = 202;
-
-                elseif app.Method.ValueIndex == 2
-                    fp = app.loopFunctInit();
-                    app.loopMehod(fp, a, b, tolerance, 0);
-                    passedFlag = 202;
-                    
-                elseif app.Method.ValueIndex == 3
-                    app.newtonMethod(a, b, tolerance, 0);
-                    passedFlag = 202;
-                end
-            else
-                %nothing to do
+            app.Result.Value = "Calculating...";
+            app.Loop.Value = "";
+            pause(1);
+            plot(app.UIAxes_2,0,0);
+            syms x;
+            errorFlag = 1 ;
+            a = app.aField.Value;
+            b = app.bField.Value;
+            tolerance = app.ToleranceField.Value;
+            f_field = app.FunctionField.Value;
+            %check_error
+            try
+                [f,errorFlag] = error_check(app,a,b,tolerance,f_field);
+            catch er
+                app.Result.Value = er.message;
             end
-
-            %%%draw plot
-            if passedFlag == 202
-                f = app.functInit();
-                draw(app,f,a,b);
-            else
-                % nothing to do
+            if app.Method_2.Value == "lặp" && ~errorFlag
+                try
+                    fp = loopFunctInit(app,app.LoopFunctionField.Value,f,a,b);
+                catch er
+                    errorFlag = 1;
+                    app.Result.Value = er.message;
+                end
+            end
+            %check_error_function
+            if ~errorFlag
+                if app.Method_2.Value == "Chia đôi" 
+                    bisectMethod(app,f,a, b, tolerance, 0);
+                elseif app.Method_2.Value == "lặp" 
+                    loopMethod(app,fp,a, b, tolerance);
+                elseif app.Method_2.Value == "Newton"
+                    newtonMethod(app,f,a, b, tolerance);
+                end
+                approximationDraw(app,f,a,b);
             end
         end
 
-        % Value changed function: Method
-        function MethodValueChanged(app, event)
+        % Value changed function: Method_2
+        function Method_2ValueChanged(app, event)
             %%turn on - off loop function field
-            if app.Method.ValueIndex == 2
-                app.clear;
+            if app.Method_2.Value == "lặp"
                 app.LoopFunctionField.Visible = "on";
             else
-                app.clear;
                 app.LoopFunctionField.Visible = "off";
             end
         end
@@ -243,29 +303,32 @@ classdef ApproximateValue_tab < matlab.apps.AppBase
             app.UIFigure.Position = [100 100 640 480];
             app.UIFigure.Name = 'MATLAB App';
 
-            % Create UIAxes
-            app.UIAxes = uiaxes(app.UIFigure);
-            title(app.UIAxes, 'ĐỒ THỊ HÀM SỐ')
-            xlabel(app.UIAxes, 'x')
-            ylabel(app.UIAxes, 'f(x)')
-            zlabel(app.UIAxes, 'Z')
-            app.UIAxes.XGrid = 'on';
-            app.UIAxes.YGrid = 'on';
-            app.UIAxes.FontSize = 14;
-            app.UIAxes.Position = [262 142 337 275];
+            % Create UIAxes_2
+            app.UIAxes_2 = uiaxes(app.UIFigure);
+            title(app.UIAxes_2, 'ĐỒ THỊ HÀM SỐ')
+            xlabel(app.UIAxes_2, 'x')
+            ylabel(app.UIAxes_2, 'f(x)')
+            zlabel(app.UIAxes_2, 'Z')
+            app.UIAxes_2.Colormap = [];
+            app.UIAxes_2.XGrid = 'on';
+            app.UIAxes_2.YGrid = 'on';
+            app.UIAxes_2.FontSize = 14;
+            app.UIAxes_2.Position = [262 142 337 275];
 
-            % Create NhpphngtrnhEditFieldLabel
-            app.NhpphngtrnhEditFieldLabel = uilabel(app.UIFigure);
-            app.NhpphngtrnhEditFieldLabel.HorizontalAlignment = 'right';
-            app.NhpphngtrnhEditFieldLabel.FontSize = 14;
-            app.NhpphngtrnhEditFieldLabel.Position = [2 395 128 22];
-            app.NhpphngtrnhEditFieldLabel.Text = 'Nhập phương trình ';
+            % Create NhphmLabel
+            app.NhphmLabel = uilabel(app.UIFigure);
+            app.NhphmLabel.HorizontalAlignment = 'right';
+            app.NhphmLabel.FontSize = 14;
+            app.NhphmLabel.Position = [19 395 70 22];
+            app.NhphmLabel.Text = 'Nhập hàm';
 
             % Create FunctionField
             app.FunctionField = uieditfield(app.UIFigure, 'text');
             app.FunctionField.Tag = 'FunctionField';
+            app.FunctionField.HorizontalAlignment = 'right';
             app.FunctionField.FontSize = 14;
-            app.FunctionField.Position = [145 395 100 22];
+            app.FunctionField.Position = [98 395 165 22];
+            app.FunctionField.Value = '3*x^3 - 8*x^2 - 20*x + 16';
 
             % Create FirstLabel
             app.FirstLabel = uilabel(app.UIFigure);
@@ -281,13 +344,13 @@ classdef ApproximateValue_tab < matlab.apps.AppBase
             app.ChnphngphpDropDownLabel.Position = [2 201 127 22];
             app.ChnphngphpDropDownLabel.Text = 'Chọn phương pháp';
 
-            % Create Method
-            app.Method = uidropdown(app.UIFigure);
-            app.Method.Items = {'Chia đôi', 'lặp', 'Newton'};
-            app.Method.ValueChangedFcn = createCallbackFcn(app, @MethodValueChanged, true);
-            app.Method.FontSize = 14;
-            app.Method.Position = [144 201 100 22];
-            app.Method.Value = 'Chia đôi';
+            % Create Method_2
+            app.Method_2 = uidropdown(app.UIFigure);
+            app.Method_2.Items = {'Chia đôi', 'lặp', 'Newton'};
+            app.Method_2.ValueChangedFcn = createCallbackFcn(app, @Method_2ValueChanged, true);
+            app.Method_2.FontSize = 14;
+            app.Method_2.Position = [144 201 100 22];
+            app.Method_2.Value = 'Chia đôi';
 
             % Create Label
             app.Label = uilabel(app.UIFigure);
@@ -302,6 +365,7 @@ classdef ApproximateValue_tab < matlab.apps.AppBase
             app.LoopFunctionField.FontSize = 14;
             app.LoopFunctionField.Visible = 'off';
             app.LoopFunctionField.Position = [109 150 154 22];
+            app.LoopFunctionField.Value = '(3*x^3 - 8*x^2 + 16)/20';
 
             % Create CalcButton
             app.CalcButton = uibutton(app.UIFigure, 'push');
@@ -314,27 +378,28 @@ classdef ApproximateValue_tab < matlab.apps.AppBase
             app.KtquLabel = uilabel(app.UIFigure);
             app.KtquLabel.HorizontalAlignment = 'right';
             app.KtquLabel.FontSize = 14;
-            app.KtquLabel.Position = [70 81 53 22];
+            app.KtquLabel.Position = [70 95 53 22];
             app.KtquLabel.Text = 'Kết quả';
 
             % Create Result
             app.Result = uitextarea(app.UIFigure);
             app.Result.Tag = 'Result';
+            app.Result.HorizontalAlignment = 'right';
             app.Result.FontSize = 14;
-            app.Result.Position = [128 80 170 23];
+            app.Result.Position = [128 80 170 51];
 
             % Create SlnlpTextAreaLabel
             app.SlnlpTextAreaLabel = uilabel(app.UIFigure);
             app.SlnlpTextAreaLabel.HorizontalAlignment = 'right';
             app.SlnlpTextAreaLabel.FontSize = 14;
-            app.SlnlpTextAreaLabel.Position = [314 79 67 22];
+            app.SlnlpTextAreaLabel.Position = [315 95 67 22];
             app.SlnlpTextAreaLabel.Text = 'Số lần lặp';
 
             % Create Loop
             app.Loop = uitextarea(app.UIFigure);
             app.Loop.Tag = 'Loop';
             app.Loop.FontSize = 14;
-            app.Loop.Position = [396 79 150 23];
+            app.Loop.Position = [397 95 150 23];
 
             % Create aEditFieldLabel
             app.aEditFieldLabel = uilabel(app.UIFigure);
@@ -347,6 +412,7 @@ classdef ApproximateValue_tab < matlab.apps.AppBase
             app.aField = uieditfield(app.UIFigure, 'numeric');
             app.aField.FontSize = 14;
             app.aField.Position = [57 315 42 22];
+            app.aField.Value = 0.2;
 
             % Create bEditFieldLabel
             app.bEditFieldLabel = uilabel(app.UIFigure);
@@ -359,6 +425,7 @@ classdef ApproximateValue_tab < matlab.apps.AppBase
             app.bField = uieditfield(app.UIFigure, 'numeric');
             app.bField.FontSize = 14;
             app.bField.Position = [182 315 52 22];
+            app.bField.Value = 0.8;
 
             % Create NhpsaisLabel
             app.NhpsaisLabel = uilabel(app.UIFigure);
@@ -371,6 +438,7 @@ classdef ApproximateValue_tab < matlab.apps.AppBase
             app.ToleranceField = uieditfield(app.UIFigure, 'numeric');
             app.ToleranceField.FontSize = 14;
             app.ToleranceField.Position = [114 268 120 22];
+            app.ToleranceField.Value = 0.005;
 
             % Create SecondLabel
             app.SecondLabel = uilabel(app.UIFigure);
