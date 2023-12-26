@@ -200,6 +200,9 @@ classdef Kiv_final < matlab.apps.AppBase
                     parse(p, xa(i))
                     parse(p, ya(i))
                 end
+                if length(unique(xa)) ~= length(ya)
+                    error('');
+                end
             catch
                 error("Nhập x/y sai format hãy nhập theo format <a1,a2,a3> (không bao gồm <> và không có dấu cách) hoặc x/y không có kích thước giống nhau hoặc đang để trống hoặc là số phức")
             end
@@ -213,6 +216,15 @@ classdef Kiv_final < matlab.apps.AppBase
            else
                  X = str2num(x);
                  Y = str2num(y);
+           end
+           if (length(X) <= 1 || length(Y) <= 1)
+               error('Mảng hồi quy kích thước phải lớn hơn 1');
+           elseif ~isreal(X) && sum(isfinite(X)) ~= length(X)
+               error('x không được là số phức hoặc giá trị vô hạn');
+           elseif ~isreal(Y) && sum(isfinite(Y)) ~= length(Y)
+               error('y không được là số phức hoặc giá trị vô hạn');
+           elseif length(unique(X)) ~= length(X)
+               error('Giá trị của mảng X không được trùng nhau');
            end
            if option == '1'  %ham mu y = ae^bx
                  if (sum(sign(Y)) < length(Y))
@@ -233,21 +245,23 @@ classdef Kiv_final < matlab.apps.AppBase
                  loi = 0;
            end
         end
-
+       
         function [CanValue,f,loi] = integral_check_error(app,OptionInput,x,y,HamField,CanField,N)
             if isempty(CanField) %xử lý lỗi ô cận
                 error('Không để trống ô cận');
             elseif (CanField(1) ~= '[' || CanField(strlength(CanField)) ~= ']' )
                 error('Vui lòng đúng format [a;b], [a,b] hoặc [a b]');
             elseif isempty(str2num(CanField(2:strlength(CanField)-1)))
-                error('Vui lòng nhập ký tự số');
+                error('Vui lòng nhập đúng format của Matlab');
             elseif length(str2num(CanField(2:strlength(CanField)-1))) ~= 2
-                error('Vui lòng đúng nhập 2 ký tự số');
+                error('Vui lòng chỉ nhập 2 ký tự số');
             else
                 CanValue = str2num(CanField(2:strlength(CanField)-1));
             end
             if  isempty(N)
                 error('Không để trống ô N');
+            elseif N <= 0 && ~isinteger(N)
+                error('N phải là số nguyên dương')
             end
             if ~OptionInput
                 if  isempty(HamField)
@@ -274,8 +288,15 @@ classdef Kiv_final < matlab.apps.AppBase
                 else
                     xa = str2num(x);
                     ya = str2num(y);
-                    f = findLagrangeFuntion(app, xa, ya);
                 end
+                if length(xa) <= 1 || length(ya) <= 1
+                    error('Mảng x,y cần phải có độ dài lớn hớn 1');
+                elseif sum([~isfinite(xa),~isreal(xa),~isfinite(ya),~isreal(ya)])
+                    error('Mảng nhập vào chỉ được là số thực');
+                elseif length(unique(xa)) ~= length(ya)
+                    error('Giá trị của mảng X không được trùng nhau');
+                end
+                f = findLagrangeFuntion(app, xa, ya);
             end
             loi = 0; %khong xay ra loi
         end
@@ -294,7 +315,7 @@ classdef Kiv_final < matlab.apps.AppBase
             end
         end
 
-        function [f,f_text,r2] = regression_linear(~,x_num,y_num)
+        function [a,b,r2] = regression_linear(~,x_num,y_num) %y = ax + b
             x_data = x_num;
             y_data = y_num;
             n = length(x_data);
@@ -304,84 +325,35 @@ classdef Kiv_final < matlab.apps.AppBase
             sumx2 = sum(x_data.^2);
             x_tb = sumx / n;
             y_tb = sumy / n;
-            a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
-            a0 = y_tb - a1*x_tb;
-            Sr = sum((y_data-a0-a1*x_data).^2);
+            a = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
+            b = y_tb - a*x_tb;
+            Sr = sum((y_data-b-a*x_data).^2);
             St = sum((y_data-y_tb).^2);
             r2 = (St - Sr) / St;
-            f = @(x) (a0 + a1*x);
-            a0_text = num2str(a0,'%.3f');
-            a1_text = num2str(a1,'%.3f');
-            f_text = [a0_text,' + x * ',a1_text];
         end
 
-        function [f,f_text,r2] = regression_nonlinear_expx(~,x_num,y_num)
+        function [a,b,r2] = regression_nonlinear_expx(app,x_num,y_num) %y = ae^(bx)
             x_data = x_num;
             y_data = log(y_num);
-            n = length(x_data);
-            sumx = sum(x_data);
-            sumy = sum(y_data);
-            sumxy = sum(x_data.*y_data);
-            sumx2 = sum(x_data.^2);
-            x_tb = sumx / n;d
-            y_tb = sumy / n;
-            a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
-            a0 = y_tb - a1*x_tb;
-            beta = a1;
-            alpha = exp(a0);
-            f = @(x) (alpha.*exp(x*beta));
-            alpha_text = num2str(alpha,'%.3f');
-            beta_text = num2str(beta,'%.3f');
-            f_text = [alpha_text,'*e^(x*',beta_text,')'];
-            Sr = sum((y_data-a0-a1*x_data).^2);
-            St = sum((y_data-y_tb).^2);
-            r2 = (St - Sr) / St;
+            [a_temp, b_temp, r2] = regression_linear(app,x_data,y_data);
+            b = a_temp;
+            a = exp(b_temp);
         end
 
-        function [f,f_text,r2] = regression_nonlinear_logarit(~,x_num,y_num)
+        function [a,b,r2] = regression_nonlinear_logarit(app,x_num,y_num)
             x_data = log(x_num);
             y_data = y_num;
-            n = length(x_data);
-            sumx = sum(x_data);
-            sumy = sum(y_data);
-            sumxy = sum(x_data.*y_data);
-            sumx2 = sum(x_data.^2);
-            x_tb = sumx / n;
-            y_tb = sumy / n;
-            a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
-            a0 = y_tb - a1*x_tb;
-            beta = a0;
-            alpha = a1;
-            f = @(x) (alpha*log(x) + beta);
-            alpha_text = num2str(alpha,'%.3f');
-            beta_text = num2str(beta,'%.3f');
-            f_text = [alpha_text,' * ln(x) + ',beta_text];
-            Sr = sum((y_data-a0-a1*x_data).^2);
-            St = sum((y_data-y_tb).^2);
-            r2 = (St - Sr) / St;
+            [a_temp, b_temp, r2] = regression_linear(app,x_data,y_data);
+            a = a_temp;
+            b = b_temp;
         end
 
-        function  [f,f_text,r2] = regression_nonlinear_xpower(~, x_num,y_num)
+        function  [a,b,r2] = regression_nonlinear_xpower(app, x_num,y_num)
             x_data = log(x_num);
             y_data = log(y_num);
-            n = length(x_data);
-            sumx = sum(x_data);
-            sumy = sum(y_data);
-            sumxy = sum(x_data.*y_data);
-            sumx2 = sum(x_data.^2);
-            x_tb = sumx / n;
-            y_tb = sumy / n;
-            a1 = (n*sumxy - sumx*sumy)/(n*sumx2 - sumx*sumx);
-            a0 = y_tb - a1*x_tb;
-            beta = a1;
-            alpha = 10^a0;
-            f = @(x) (alpha*x^beta);
-            alpha_text = num2str(alpha,'%.3f');
-            beta_text = num2str(beta,'%.3f');
-            f_text = [alpha_text,'*x^',beta_text];
-            Sr = sum((y_data-a0-a1*x_data).^2);
-            St = sum((y_data-y_tb).^2);
-            r2 = (St - Sr) / St;
+            [a_temp, b_temp, r2] = regression_linear(app,x_data,y_data);
+            b = a_temp;
+            a = b_temp;
         end
 
         function [xa,ya,x, emptyFlag] = checkEmpty(app)
@@ -403,7 +375,9 @@ classdef Kiv_final < matlab.apps.AppBase
                         app.ResultInter.Value = "Kích thước mảng phải lớn hơn 1"; %2mang co 1 gia tri
                     elseif sum([~isfinite(xa),~isreal(xa),~isfinite(ya),~isreal(ya)])
                         app.ResultInter.Value = "Mảng nhập vào chỉ là số thực";
-                    else
+                    elseif length(unique(xa)) ~= length(xa)
+                        error('Giá trị của mảng X không được trùng nhau');
+                    else    
                         emptyFlag = 1; %%passed
                     end
                 end
@@ -442,12 +416,10 @@ classdef Kiv_final < matlab.apps.AppBase
                     end
                     resultLagrange = resultLagrange + temp*yData(i);
                 end
+                digits(3);
                 resultLagrange(x) = resultLagrange;
-                digits(5);
-                resultLagrange(x) = resultLagrange;
-                collect(resultLagrange);
-                simplify(resultLagrange);
-                resultLagrange = vpa(resultLagrange); 
+                resultLagrange = collect(resultLagrange);
+                resultLagrange = vpa(resultLagrange);
             catch
                 app.ResultInter.Value = "Lỗi ngoài ý muốn" ;
             end
@@ -467,10 +439,9 @@ classdef Kiv_final < matlab.apps.AppBase
                 for i = n-1:-1:1
                     resultNewton = resultNewton * (x - xData(i)) + da(i);
                 end
-                digits(5);
+                digits(3);
                 resultNewton(x) = resultNewton;
-                collect(resultNewton);
-                simplify(resultNewton);
+                resultNewton = collect(resultNewton);
                 resultNewton = vpa(resultNewton); 
             catch
                 app.ResultInter.Value = "Lỗi ngoài ý muốn" ;
@@ -941,13 +912,29 @@ classdef Kiv_final < matlab.apps.AppBase
             if loi == 0
                 try
                     if option == '0'
-                        [f,f_text,r2] = regression_linear(app, x_num,y_num);
+                        [a,b,r2] = regression_linear(app, x_num,y_num);
+                        f = @(x) (a*x + b);
+                        b_text = num2str(b,'%.3f');
+                        a_text = num2str(a,'%.3f');
+                        f_text = [b_text,' + x * ',a_text];
                     elseif option == '1'   % a*e^(b*x)
-                        [f,f_text,r2] = regression_nonlinear_expx(app, x_num,y_num);
+                        [a,b,r2] = regression_nonlinear_expx(app, x_num,y_num);
+                        f = @(x) (a.*exp(x.*b));
+                        a_text = num2str(a,'%.3f');
+                        b_text = num2str(b,'%.3f');
+                        f_text = [a_text,'*e^(x*',b_text,')'];
                     elseif option == '2'   % a*x^(b)
-                        [f,f_text,r2] = regression_nonlinear_xpower(app, x_num,y_num);
+                        [a,b,r2] = regression_nonlinear_xpower(app, x_num,y_num);
+                        f = @(x) (a*x^b);
+                        a_text = num2str(a,'%.3f');
+                        b_text = num2str(b,'%.3f');
+                        f_text = [a_text,'*x^',b_text];
                     else %  aln(x) + b
-                        [f,f_text,r2] = regression_nonlinear_logarit(app, x_num,y_num);
+                        [a,b,r2] = regression_nonlinear_logarit(app, x_num,y_num);
+                        f = @(x) (a*log(x) + b);
+                        a_text = num2str(a,'%.3f');
+                        b_text = num2str(b,'%.3f');
+                        f_text = [a_text,' * ln(x) + ',b_text];
                     end
                     if ( ~isreal(f(Dudoan)) || ~isfinite(f(Dudoan)))
                         error('Hàm số hổi quy không xác định với giá trị dự đoán');
